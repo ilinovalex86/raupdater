@@ -1,5 +1,7 @@
 github.com/ilinovalex86/connection v0.0.1 h1:GF7wEURR/ICOsBuQd6mn1qWqHw70yqopwC062l4kaBs=
 github.com/ilinovalex86/connection v0.0.1/go.mod h1:ICh4SydvoImApEnb7bZdRQOA0N3ryvnpYM0fcvFmLoo=
+github.com/ilinovalex86/connection v0.0.2 h1:4smgCW87hw3TnidEvm7Li+nJoy8VXMWOsV6ddcyjBQM=
+github.com/ilinovalex86/connection v0.0.2/go.mod h1:ICh4SydvoImApEnb7bZdRQOA0N3ryvnpYM0fcvFmLoo=
 github.com/ilinovalex86/explorer v0.0.1 h1:yCxoSomOVJM2q6GFr5TlHAOkPFpUqggUObOWky0akUk=
 github.com/ilinovalex86/explorer v0.0.1/go.mod h1:Wb8nDqWS54ZrJASb0Ona8hmmcORcBWDYSSb9yGwVEkg=
 golang.org/x/text v0.3.7 h1:olpwvP2KacW1ZWvsR7uQhoyTYvKAupfQrRGBFM352Gk=
