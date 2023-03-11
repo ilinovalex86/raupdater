@@ -80,6 +80,12 @@ func init() {
 		}
 		file.Close()
 	}
+	if runtime.GOOS == "windows" {
+		l.eol = "\r\n"
+	}
+	if runtime.GOOS == "linux" {
+		l.eol = "\n"
+	}
 	if ex.ExistFile(configFile) {
 		data, err := ex.ReadFileFull(configFile)
 		if err != nil {
