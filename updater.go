@@ -72,6 +72,7 @@ type clientData struct {
 }
 
 func init() {
+	const funcNameLog = "init(): "
 	if !ex.ExistFile(l.fileName) {
 		file, err := os.OpenFile(l.fileName, os.O_CREATE, 0666)
 		if err != nil {
@@ -79,20 +80,14 @@ func init() {
 		}
 		file.Close()
 	}
-	if runtime.GOOS == "windows" {
-		l.eol = "\r\n"
-	}
-	if runtime.GOOS == "linux" {
-		l.eol = "\n"
-	}
 	if ex.ExistFile(configFile) {
 		data, err := ex.ReadFileFull(configFile)
 		if err != nil {
-			toLog("init: read conf file", true)
+			toLog(funcNameLog+"read conf file", true)
 		}
 		err = json.Unmarshal(data, &conf)
 		if err != nil {
-			toLog("init: unmarshal conf file", true)
+			toLog(funcNameLog+"unmarshal conf file", true)
 		}
 	} else {
 		conf := config{
@@ -104,20 +99,20 @@ func init() {
 		}
 		data, err := json.MarshalIndent(&conf, "", "  ")
 		if err != nil {
-			toLog("init: marshal conf file", true)
+			toLog(funcNameLog+"marshal conf file", true)
 		}
 		err = ioutil.WriteFile(configFile, data, 0644)
 		if err != nil {
-			toLog("init: write conf file", true)
+			toLog(funcNameLog+"write conf file", true)
 		}
-		log.Fatal("Файл конфигурации не найден. Создан новый файл конфигурации.")
+		toLog("Файл конфигурации не найден. Создан новый файл конфигурации.", true)
 	}
 	if runtime.GOOS == "windows" {
 		clientApp += ".exe"
 		newClientApp += ".exe"
 		path, err := os.Executable()
 		if err != nil {
-			toLog("init: os.Executable()", true)
+			toLog(funcNameLog+"os.Executable()", true)
 		}
 		i := strings.LastIndex(path, "\\")
 		path = strings.Replace(path, path[i+1:], "", 1)
@@ -150,45 +145,47 @@ func newClient() *clientData {
 
 //Получает файл актуального клиента
 func (cl *clientData) downloadNewClient(q cn.Query) error {
+	const funcNameLog = "cl.downloadNewClient(): "
 	cn.SendSync(cl.conn)
 	err := cn.GetFile(q.Query, q.DataLen, cl.conn)
 	if err != nil {
-		return errors.New("downloadNewClient")
+		return errors.New(funcNameLog + "downloadNewClient")
 	}
 	return nil
 }
 
 //Подключается к серверу и получаетот него указание
 func (cl *clientData) connect() error {
+	const funcNameLog = "cl.connect(): "
 	if !cl.validOnServer(cl.conn) {
-		toLog("connect: Valid on Server", true)
+		toLog(funcNameLog+"Valid on Server", true)
 	}
 	err := cn.SendString(conf.ClientId, cl.conn)
 	if err != nil {
-		return errors.New("connect: SendString(conf.ClientId, cl.conn)")
+		return errors.New(funcNameLog + "SendString(conf.ClientId, cl.conn)")
 	}
 	cn.ReadSync(cl.conn)
 	jsonData, err := json.Marshal(cl)
 	if err != nil {
-		return errors.New("connect: json.Marshal(cl)")
+		return errors.New(funcNameLog + "json.Marshal(cl)")
 	}
 	err = cn.SendBytesWithDelim(jsonData, cl.conn)
 	if err != nil {
-		return errors.New("connect: SendBytesWithDelim(jsonData, cl.conn)")
+		return errors.New(funcNameLog + "SendBytesWithDelim(jsonData, cl.conn)")
 	}
 	q, err := cn.ReadQuery(cl.conn)
 	if err != nil {
-		return errors.New("connect: ReadQuery(cl.conn)")
+		return errors.New(funcNameLog + "ReadQuery(cl.conn)")
 	}
-	toLog(fmt.Sprintf("Query: %#v", q), false)
+	toLog(fmt.Sprintf("--> %#v", q), false)
 	fmt.Printf("Query: %#v\n", q)
 	switch q.Method {
 	case "already exist":
-		log.Fatal("already exist")
+		toLog(funcNameLog+"already exist", true)
 	case "downloadNewClient":
 		err = cl.downloadNewClient(q)
 		if err != nil {
-			return err
+			return errors.New(funcNameLog + fmt.Sprint(err))
 		}
 		path, err := os.Stat(newClientApp)
 		if err == nil && !path.IsDir() {
@@ -197,49 +194,52 @@ func (cl *clientData) connect() error {
 			if clientExist {
 				err = os.Remove(clientApp)
 				if err != nil {
-					return errors.New("connect: os.Remove(clientApp)")
+					return errors.New(funcNameLog + "os.Remove(clientApp)")
 				}
 			}
 			time.Sleep(time.Second)
 			err := os.Rename(newClientApp, clientApp)
 			if err != nil {
-				return errors.New("connect: os.Rename(newClientApp, clientApp)")
+				return errors.New(funcNameLog + "os.Rename(newClientApp, clientApp)")
 			}
 			time.Sleep(time.Second)
 			if runtime.GOOS != "windows" {
 				err = os.Chmod(clientApp, 0777)
 				if err != nil {
-					return errors.New("connect: os.Chmod(clientApp, 0777)")
+					return errors.New(funcNameLog + "os.Chmod(clientApp, 0777)")
 				}
 				time.Sleep(time.Second)
 			}
 		} else {
-			toLog("connect: newClientApp: if err == nil && !path.IsDir()", true)
+			toLog(funcNameLog+"newClientApp: if err == nil && !path.IsDir()", true)
 		}
 		return nil
 	case "lenClient":
 		data, err := ex.ReadFileFull(clientApp)
 		if err != nil {
-			toLog("connect: ReadFileFull(clientApp)", true)
+			toLog(funcNameLog+"ReadFileFull(clientApp)", true)
 		}
 		if len(data) != q.DataLen {
-			return errors.New("connect: wrong client")
+			return errors.New(funcNameLog + "wrong client")
 		}
 		return nil
 	case "getLog":
 		data, err := ex.ReadFileFull(logFileName)
 		if err != nil {
-			err = cn.SendQuery(cn.Query{Query: "err read log file"}, cl.conn)
-			toLog("connect: read log file Full", true)
+			err2 := cn.SendQuery(cn.Query{Query: "err read log file"}, cl.conn)
+			if err2 != nil {
+				return errors.New(funcNameLog + "cn.SendQuery(cn.Query{Query: \"err read log file\"}, cl.conn)")
+			}
+			return errors.New(funcNameLog + "ex.ReadFileFull(logFileName)")
 		}
 		err = cn.SendQuery(cn.Query{DataLen: len(data)}, cl.conn)
 		if err != nil {
-			return errors.New("connect: cn.SendQuery(cn.Query{DataLen: len(fileBytes)}, cl.conn)")
+			return errors.New(funcNameLog + "cn.SendQuery(cn.Query{DataLen: len(fileBytes)}, cl.conn)")
 		}
 		cn.ReadSync(cl.conn)
 		err = cn.SendBytes(data, cl.conn)
 		if err != nil {
-			return errors.New("connect: cn.SendBytes(data, cl.conn)")
+			return errors.New(funcNameLog + "cn.SendBytes(data, cl.conn)")
 		}
 		return errors.New("send logFile")
 	}
@@ -248,19 +248,20 @@ func (cl *clientData) connect() error {
 
 //Проходит валидацию при подключении к серверу
 func (cl *clientData) validOnServer(conn net.Conn) bool {
+	const funcNameLog = "cl.validOnServer(): "
 	var code = make([]byte, 16)
 	bc, err := aes.NewCipher([]byte(key))
 	if err != nil {
-		toLog("validOnServer: aes.NewCipher([]byte(key))", true)
+		toLog(funcNameLog+"aes.NewCipher([]byte(key))", true)
 	}
 	err = cn.SendString("updater", conn)
 	if err != nil {
-		toLog("validOnServer: SendString(\"updater\", conn)", false)
+		toLog(funcNameLog+"SendString(\"updater\", conn)", false)
 		return false
 	}
 	data, err := cn.ReadBytesByLen(16, conn)
 	if err != nil {
-		toLog("validOnServer: ReadBytesByLen(16, conn)", false)
+		toLog(funcNameLog+"ReadBytesByLen(16, conn)", false)
 		return false
 	}
 	bc.Decrypt(code, data)
@@ -269,15 +270,16 @@ func (cl *clientData) validOnServer(conn net.Conn) bool {
 	bc.Encrypt(code, []byte(res))
 	err = cn.SendBytes(code, conn)
 	if err != nil {
-		toLog("validOnServer: SendBytes(code, conn)", false)
+		toLog(funcNameLog+"SendBytes(code, conn)", false)
 		return false
 	}
 	mes, err := cn.ReadString(conn)
 	if err != nil {
-		toLog("validOnServer: ReadString(conn)//res of valid", false)
+		toLog(funcNameLog+"ReadString(conn)//res of valid", false)
 		return false
 	}
 	if mes != "ok" {
+		toLog(funcNameLog+"mes != \"ok\"", false)
 		return false
 	}
 	return true
@@ -297,8 +299,9 @@ func clientRun() int {
 }
 
 func main() {
+	const funcNameLog = "main(): "
 	cl := newClient()
-	toLog("Start updater", false)
+	toLog("start updater", false)
 	fmt.Println("Start updater")
 	for {
 		conn, err := net.Dial("tcp", conf.UpdaterServer)
@@ -313,20 +316,20 @@ func main() {
 		cl.conn = conn
 		err = cl.connect()
 		if err != nil {
-			toLog(fmt.Sprint(err), false)
+			toLog(funcNameLog+fmt.Sprint(err), false)
 			fmt.Println(err, "sleep min.")
 			cl.conn.Close()
 			time.Sleep(time.Minute)
 			continue
 		}
 		if exitCode := clientRun(); exitCode > 0 {
-			toLog("exitCode. sleep min.", false)
+			toLog(funcNameLog+"exitCode. sleep min.", false)
 			fmt.Println("exitCode. sleep min.")
 			cl.conn.Close()
 			time.Sleep(time.Minute)
 			continue
 		}
-		toLog("No exitCode. sleep min.", false)
+		toLog(funcNameLog+"No exitCode. sleep min.", false)
 		fmt.Println("No exitCode. sleep min.")
 		cl.conn.Close()
 		time.Sleep(time.Minute)
